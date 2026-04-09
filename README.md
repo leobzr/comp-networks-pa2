@@ -1,117 +1,110 @@
-Initial Design Plan - Splitting the Work.
+# PA-2 TCP Discrete Event Simulator
 
-Person 1 — Simulator Core & Network
+## General
 
-Simulated clock
-Event queue (priority queue by time)
-Packet & ACK data structures
-Sender/receiver abstractions (interfaces/base classes)
-Network model: propagation delay, loss model (random drop by probability)
-Metric collection hooks (packet sent, received, dropped, timestamps)
-Logging/output utilities
+### Objective
 
-Person 2 — TCP Logic & Analysis
+Understand the inner workings of TCP Tahoe and TCP Reno by building and testing a discrete event simulator (DES).
 
-TCP Tahoe state machine (slow start, congestion avoidance, timeout)
-TCP Reno state machine (+ fast retransmit/fast recovery)
-Duplicate ACK handling
-Timeout behavior
-Experiment runner (sweep over loss probabilities, call Person 1's simulator)
-Graph generation (throughput, goodput, delay, jitter vs. loss probability)
-Written comparison/report
+### Project Split
 
+Person 1 handles simulator core and network plumbing.
 
-===================================================================================
+Person 2 handles TCP Tahoe/Reno logic and performance analysis.
 
+### Shared Design Decisions
 
-## Shared Design Decisions
+#### Events
 
-These are the agreed-upon assumptions both implementations must follow before writing any code.
+The simulator handles these event types:
 
----
+- `SEND`
+- `RECEIVE`
+- `ACK`
+- `TIMEOUT`
+- `DROP`
 
-### Events
+#### RTT Model
 
-The simulator handles the following event types:
+- Fixed RTT
+- Constant symmetric propagation delay
+- No queueing or variable latency
 
-- `SEND` — sender transmits a packet onto the network
-- `RECEIVE` — packet arrives at the receiver
-- `ACK` — acknowledgment sent back to the sender
-- `TIMEOUT` — retransmission timer expires for a packet
-- `DROP` — packet is silently lost in the network
+#### Loss Model
 
----
+- Uniform random packet loss with probability `p`
+- Sender infers loss through timeout/duplicate ACK behavior
+- `p` is swept during experiments
 
-### RTT Model
-
-- **Fixed RTT** is used for simplicity.
-- Propagation delay is constant and symmetric.
-- No queuing delay or variable latency is modeled.
-
----
-
-### Loss Model
-
-- **Drop on receive, uniform random.**
-- Each packet is independently dropped with probability `p` upon arrival at the receiver.
-- The sender receives no signal — it detects loss via timeout or duplicate ACKs.
-- `p` is a configurable parameter swept across experiments.
-
----
-
-### Performance Metrics
+#### Performance Metrics
 
 | Metric | Formula |
 |---|---|
-| Throughput | `unique_packets_received / total_simulated_time` (packets/sec) |
-| Goodput | `unique_packets_delivered / total_packets_sent` (ratio 0–1) |
-| Average Delay | `mean(time_ACKed − time_first_sent)` across all delivered packets |
+| Throughput | `unique_packets_received / total_simulated_time` |
+| Goodput | `unique_packets_delivered / total_packets_sent` |
+| Average Delay | `mean(time_ACKed - time_first_sent)` |
 | Delay Jitter | `std_dev(individual_delays)` |
 
-> **Note:** retransmissions count toward `total_packets_sent` but not toward `unique_packets_delivered`.  
-> Delay is measured from **first transmission**, not from retransmissions.
+Retransmissions count toward `total_packets_sent` but not `unique_packets_delivered`.
 
-**Per-packet tracking required:**
+Per-packet tracking:
+
 ```
-packet_id → { time_first_sent, time_acked, retransmit_count }
-```
-
----
-
-### Module Interface
-
-Person 1 (simulator core) exposes:
-
-```python
-class Simulator:
-    def schedule_event(time, event_type, data)
-    def get_current_time() -> float
-    def run()
-
-class Network:
-    def send_packet(packet)
-    def send_ack(ack)
-
-class MetricsCollector:
-    def record_sent(packet_id, time)
-    def record_received(packet_id, time)
-    def record_dropped(packet_id)
-    def record_retransmit(packet_id)
-    def report() -> dict   # returns throughput, goodput, avg_delay, jitter
+packet_id -> { time_first_sent, time_acked, retransmit_count }
 ```
 
-Person 2 (TCP logic) implements:
+#### Collaboration Rule
 
-```python
-class TCPSender:
-    def on_ack_received(ack)
-    def on_timeout(packet_id)
-    def send_next()
+Person 2 only calls Person 1 APIs.
 
-class TCPTahoe(TCPSender): ...
-class TCPReno(TCPSender): ...
+Person 1 only calls Person 2 callbacks.
+
+Neither side reaches into the other side internals.
+
+## Person One (TCP DES)
+
+### Scope
+
+- Simulated clock
+- Event queue (priority by event time)
+- Packet and ACK data structures
+- Sender/receiver abstractions for handoff
+- Network model (fixed propagation delay + random loss)
+- Metrics hooks and report generation
+- Logging/output utilities
+
+### Finalized Person 1 Defaults
+
+- Loss model: data packets only are dropped (ACKs are not dropped)
+- Timeout model: one timeout event per packet transmission; stale timeouts ignored once ACKed
+- Jitter: population standard deviation (`statistics.pstdev`)
+
+### Run Person 1 Code
+
+From the `tcp_des` folder:
+
+```bash
+./run.sh
 ```
 
-> **Rule:** Person 2 calls into Person 1's API only (`schedule_event`, `send_packet`, `MetricsCollector`).  
-> Person 1 calls into Person 2's callbacks only (`on_ack_received`, `on_timeout`).  
-> Neither side reaches into the other's internals.
+`run.sh` installs dependencies, runs tests, then runs a dummy sender/receiver simulation that prints metrics.
+
+## Person Two (TCP Logic and Analysis)
+
+### Scope
+
+- TCP Tahoe state machine (slow start, congestion avoidance, timeout)
+- TCP Reno state machine (fast retransmit/fast recovery)
+- Duplicate ACK handling
+- Timeout behavior tuning
+- Experiment runner over packet loss probabilities
+- Graph generation (throughput/goodput/delay/jitter vs. loss)
+- Written comparison report
+
+### Expected Integration Surface
+
+Person 2 should implement sender logic using the agreed callbacks:
+
+- `on_ack_received(ack)`
+- `on_timeout(packet_id)`
+- `send_next()`

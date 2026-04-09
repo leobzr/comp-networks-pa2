@@ -15,6 +15,7 @@ class SimulationStack:
     simulator: SimulatorLike
     network: NetworkLike
     metrics: MetricsCollectorLike
+    bind_sender: Callable[[object], None] | None = None
 
 
 SimulationFactory = Callable[[float, int], SimulationStack]
@@ -42,6 +43,11 @@ def run_single_experiment(
         sender = TCPReno(stack.simulator, stack.network, stack.metrics, config)
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
+
+    if stack.bind_sender is not None:
+        stack.bind_sender(sender)
+    elif hasattr(stack.simulator, "bind_sender"):
+        stack.simulator.bind_sender(sender)
 
     sender.send_next()
     stack.simulator.run()

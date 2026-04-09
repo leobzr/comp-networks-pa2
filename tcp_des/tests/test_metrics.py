@@ -1,4 +1,4 @@
-from simulator.metrics import MetricsCollector
+from tcp_des.simulator.metrics import MetricsCollector
 
 
 def test_metrics_report_basic_values():

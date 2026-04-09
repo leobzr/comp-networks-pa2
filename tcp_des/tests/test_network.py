@@ -1,6 +1,6 @@
-from simulator.event import EventType
-from simulator.network import Network, NetworkConfig
-from simulator.packet import Ack, Packet
+from tcp_des.simulator.event import EventType
+from tcp_des.simulator.network import Network, NetworkConfig
+from tcp_des.simulator.packet import Ack, Packet
 
 
 def test_network_drop_probability_zero_never_drops():

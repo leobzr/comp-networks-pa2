@@ -19,13 +19,11 @@ class MetricsCollector:
         self._packet_data = defaultdict(PacketTiming)
 
     def record_sent(self, packet_id: int, time: float) -> None:
-        # First send sets delay baseline; later sends count as retransmits.
+        # First send sets delay baseline; retransmit count is tracked by record_retransmit.
         self.total_packets_sent += 1
         entry = self._packet_data[packet_id]
         if entry.time_first_sent is None:
             entry.time_first_sent = time
-        else:
-            entry.retransmit_count += 1
 
     def record_received(self, packet_id: int, time: float) -> None:
         self._packet_data[packet_id].time_acked = time

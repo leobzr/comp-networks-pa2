@@ -42,8 +42,14 @@ class SimulatorAdapter:
 
     def schedule_event(self, time: float, event_type, data=None) -> None:
         mapped_event_type = event_type
-        if isinstance(event_type, str) and event_type.upper() == "TIMEOUT":
-            mapped_event_type = EventType.TIMEOUT
+        if isinstance(event_type, str):
+            normalized = event_type.upper()
+            if normalized == "TIMEOUT":
+                mapped_event_type = EventType.TIMEOUT
+            elif normalized in EventType.__members__:
+                mapped_event_type = EventType[normalized]
+            else:
+                raise ValueError(f"Unsupported event type string: {event_type}")
 
         mapped_data = data
         if mapped_event_type == EventType.TIMEOUT and isinstance(data, dict):

@@ -1,5 +1,5 @@
-from simulator.event import Event, EventType
-from simulator.event_queue import EventQueue
+from tcp_des.simulator.event import Event, EventType
+from tcp_des.simulator.event_queue import EventQueue
 
 
 def test_event_queue_orders_by_time_then_priority():

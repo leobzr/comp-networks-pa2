@@ -1,110 +1,40 @@
 # PA-2 TCP Discrete Event Simulator
 
-## General
+## Project Status
 
-### Objective
+Project implementation is complete and integrated.
 
-Understand the inner workings of TCP Tahoe and TCP Reno by building and testing a discrete event simulator (DES).
+- Theo completed the DES core (`tcp_des`): clock, events, queue, simulator loop, network/loss model, metrics, and base abstractions.
+- Leo completed TCP logic (`TCP_logic`): Tahoe, Reno, experiments, and analysis.
+- Integration adapters connect both sides and run end-to-end experiments.
+- Unified and component-level run scripts are available.
 
-### Project Split
+## What Is Included
 
-Person 1 handles simulator core and network plumbing.
+- Discrete event simulator with event types: `SEND`, `RECEIVE`, `ACK`, `TIMEOUT`, `DROP`
+- Fixed RTT model and configurable packet loss probability sweep
+- Performance metrics: throughput, goodput, average delay, delay jitter
+- TCP Tahoe and TCP Reno sender behavior with integration tests
+- Graph generation for Tahoe vs Reno comparison
 
-Person 2 handles TCP Tahoe/Reno logic and performance analysis.
+## Finalized Assumptions
 
-### Shared Design Decisions
+- Loss is applied to data packets only; ACKs are not dropped.
+- Timeout is modeled per packet transmission; stale timeout events are ignored after ACK.
+- Delay jitter uses population standard deviation (`statistics.pstdev`).
 
-#### Events
+## Run
 
-The simulator handles these event types:
-
-- `SEND`
-- `RECEIVE`
-- `ACK`
-- `TIMEOUT`
-- `DROP`
-
-#### RTT Model
-
-- Fixed RTT
-- Constant symmetric propagation delay
-- No queueing or variable latency
-
-#### Loss Model
-
-- Uniform random packet loss with probability `p`
-- Sender infers loss through timeout/duplicate ACK behavior
-- `p` is swept during experiments
-
-#### Performance Metrics
-
-| Metric | Formula |
-|---|---|
-| Throughput | `unique_packets_received / total_simulated_time` |
-| Goodput | `unique_packets_delivered / total_packets_sent` |
-| Average Delay | `mean(time_ACKed - time_first_sent)` |
-| Delay Jitter | `std_dev(individual_delays)` |
-
-Retransmissions count toward `total_packets_sent` but not `unique_packets_delivered`.
-
-Per-packet tracking:
-
-```
-packet_id -> { time_first_sent, time_acked, retransmit_count }
-```
-
-#### Collaboration Rule
-
-Person 2 only calls Person 1 APIs.
-
-Person 1 only calls Person 2 callbacks.
-
-Neither side reaches into the other side internals.
-
-## Person One (TCP DES)
-
-### Scope
-
-- Simulated clock
-- Event queue (priority by event time)
-- Packet and ACK data structures
-- Sender/receiver abstractions for handoff
-- Network model (fixed propagation delay + random loss)
-- Metrics hooks and report generation
-- Logging/output utilities
-
-### Finalized Person 1 Defaults
-
-- Loss model: data packets only are dropped (ACKs are not dropped)
-- Timeout model: one timeout event per packet transmission; stale timeouts ignored once ACKed
-- Jitter: population standard deviation (`statistics.pstdev`)
-
-### Run Person 1 Code
-
-From the `tcp_des` folder:
+From the project root (recommended full run):
 
 ```bash
-./run.sh
+./run_all.sh
 ```
 
-`run.sh` installs dependencies, runs tests, then runs a dummy sender/receiver simulation that prints metrics.
+This runs merged tests, Person 1 demo metrics, and Person 2 integration sweep/plot.
 
-## Person Two (TCP Logic and Analysis)
+## Output
 
-### Scope
-
-- TCP Tahoe state machine (slow start, congestion avoidance, timeout)
-- TCP Reno state machine (fast retransmit/fast recovery)
-- Duplicate ACK handling
-- Timeout behavior tuning
-- Experiment runner over packet loss probabilities
-- Graph generation (throughput/goodput/delay/jitter vs. loss)
-- Written comparison report
-
-### Expected Integration Surface
-
-Person 2 should implement sender logic using the agreed callbacks:
-
-- `on_ack_received(ack)`
-- `on_timeout(packet_id)`
-- `send_next()`
+- Test suites for DES core and integrated TCP behavior
+- Console summary comparing Tahoe vs Reno
+- Plot image saved to `outputs/tahoe_vs_reno_metrics.png`

@@ -31,7 +31,7 @@ From the project root (recommended full run):
 ./run_all.sh
 ```
 
-This runs merged tests, Person 1 demo metrics, and Person 2 integration sweep/plot.
+This runs merged tests, Theo demo metrics, and Leo integration sweep/plot.
 
 ## Output
 

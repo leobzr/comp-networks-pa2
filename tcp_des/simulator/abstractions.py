@@ -6,7 +6,7 @@ from .packet import Ack, Packet
 
 
 class BaseSender(ABC):
-    """Callback surface Person 2 implements for Tahoe and Reno senders."""
+    """Callback surface Leo implements for Tahoe and Reno senders."""
 
     @abstractmethod
     def on_ack_received(self, ack: Ack) -> None:

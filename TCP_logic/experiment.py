@@ -28,7 +28,7 @@ def run_single_experiment(
     config: SenderConfig,
     simulation_factory: SimulationFactory,
 ) -> ExperimentResult:
-    """Run one Tahoe/Reno experiment against Person 1 simulator APIs.
+    """Run one Tahoe/Reno experiment against Theo simulator APIs.
 
     Expected integration assumptions from the shared project contract:
     - Loss is applied to data packets only.

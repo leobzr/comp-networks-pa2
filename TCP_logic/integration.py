@@ -18,8 +18,22 @@ class CumulativeAckReceiver(BaseReceiver):
         return Ack(ack_id=packet.packet_id)
 
 
+class GapAwareCumulativeAckReceiver(BaseReceiver):
+    """ACKs highest contiguous packet id; emits duplicate ACKs when gaps exist."""
+
+    def __init__(self) -> None:
+        self._received: set[int] = set()
+        self._highest_contiguous = 0
+
+    def on_packet_received(self, packet: Packet) -> Ack:
+        self._received.add(packet.packet_id)
+        while (self._highest_contiguous + 1) in self._received:
+            self._highest_contiguous += 1
+        return Ack(ack_id=self._highest_contiguous)
+
+
 class SenderBridge(BaseSender):
-    """Bridge simulator callbacks into Person 2 sender callbacks."""
+    """Bridge simulator callbacks into Leo sender callbacks."""
 
     def __init__(self, sender) -> None:
         self._sender = sender
@@ -35,7 +49,7 @@ class SenderBridge(BaseSender):
 
 
 class SimulatorAdapter:
-    """Adapts Person 2 schedule_event shape to simulator EventType events."""
+    """Adapts Leo schedule_event shape to simulator EventType events."""
 
     def __init__(self, simulator: Simulator) -> None:
         self._simulator = simulator
@@ -78,7 +92,7 @@ class NetworkAdapter:
 
 
 class MetricsAdapter:
-    """Adapts simulator metric names/signature to Person 2 expectations."""
+    """Adapts simulator metric names/signature to Leo expectations."""
 
     def __init__(self, metrics: MetricsCollector, simulator: Simulator) -> None:
         self._metrics = metrics
@@ -112,6 +126,7 @@ def create_integrated_stack(
     seed: int,
     config: SenderConfig,
     propagation_delay: float = 0.1,
+    receiver_mode: str = "simple",
 ) -> SimulationStack:
     """Create one integrated simulator stack for a loss probability point."""
     metrics = MetricsCollector()
@@ -120,7 +135,12 @@ def create_integrated_stack(
         rng_seed=seed,
     )
     simulator = Simulator(network=network, metrics=metrics, timeout_interval=config.timeout_interval)
-    simulator.bind_receiver(CumulativeAckReceiver())
+    if receiver_mode == "simple":
+        simulator.bind_receiver(CumulativeAckReceiver())
+    elif receiver_mode == "gap-aware":
+        simulator.bind_receiver(GapAwareCumulativeAckReceiver())
+    else:
+        raise ValueError(f"Unsupported receiver_mode: {receiver_mode}")
 
     sim_adapter = SimulatorAdapter(simulator)
     net_adapter = NetworkAdapter(network=network, simulator=simulator)

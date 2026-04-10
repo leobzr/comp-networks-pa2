@@ -49,11 +49,16 @@ class DummyReceiver(BaseReceiver):
 
 
 def main() -> None:
-    metrics = MetricsCollector()
-    network = Network(NetworkConfig(propagation_delay=0.2, loss_probability=0.2), rng_seed=7)
-    simulator = Simulator(network=network, metrics=metrics, timeout_interval=0.6)
+    total_packets = 8
+    propagation_delay = 0.2
+    loss_probability = 0.2
+    timeout_interval = 0.6
 
-    sender = DummySender(simulator=simulator, total_packets=8)
+    metrics = MetricsCollector()
+    network = Network(NetworkConfig(propagation_delay=propagation_delay, loss_probability=loss_probability), rng_seed=7)
+    simulator = Simulator(network=network, metrics=metrics, timeout_interval=timeout_interval)
+
+    sender = DummySender(simulator=simulator, total_packets=total_packets)
     receiver = DummyReceiver()
     simulator.bind_sender(sender)
     simulator.bind_receiver(receiver)
@@ -64,7 +69,11 @@ def main() -> None:
     total_time = simulator.get_current_time()
     report = metrics.report(total_simulated_time=total_time)
 
-    print("=== Dummy TCP Metrics ===")
+    print("=== Theo Simulator Sanity Metrics ===")
+    print(
+        f"scenario: packets={total_packets}, loss_probability={loss_probability}, "
+        f"one_way_delay={propagation_delay}, timeout_interval={timeout_interval}"
+    )
     print(f"simulated_time: {total_time:.3f}s")
     for key, value in report.items():
         print(f"{key}: {value}")

@@ -1,119 +1,148 @@
-# PA-2 Report: TCP Tahoe vs TCP Reno in a Discrete Event Simulator
+# PA-2 Report: TCP Tahoe vs Reno vs CUBIC in a Discrete Event Simulator
 
 ## 1. Objective
 
-This project evaluates TCP Tahoe and TCP Reno using a discrete event simulator (DES).  
-The goal is to compare performance under packet loss using multiple metrics and explain observed behavior.
+This project extends the PA2 TCP DES by adding TCP CUBIC and comparing it against Tahoe and Reno under different network conditions.
 
-## 2. Simulation Setup
+The assignment reference is RFC 9438, *CUBIC for Fast and Long-Distance Networks*.
 
-### 2.1 Core Simulator (Theo)
+## 2. RFC 9438 Digest (What Matters for Implementation)
 
-The simulator provides:
+CUBIC differs from Reno-style AIMD by using a time-based cubic growth function during congestion avoidance:
 
-- Simulated clock
-- Event queue and event dispatch (`SEND`, `RECEIVE`, `ACK`, `TIMEOUT`, `DROP`)
-- Network model with fixed one-way propagation delay and configurable packet loss probability
-- Metrics collection for throughput, goodput, average delay, and jitter
+- It uses a concave then convex growth profile around the previous saturation point (`Wmax`).
+- It preserves Reno-friendliness with `West` (Reno-equivalent estimate) when the cubic function would be too conservative.
+- It uses multiplicative decrease with `beta_cubic = 0.7` (instead of Reno's 0.5 behavior).
+- It is designed for better scalability and stability on higher-BDP paths.
 
-### 2.2 TCP Implementations (Leo)
+Core ideas mapped into this PA2 implementation:
 
-- TCP Tahoe
-- TCP Reno
-- Loss sweep runner and graph generation
+- CUBIC window target via the cubic function (`C = 0.4`, `beta = 0.7`).
+- Reno-friendly fallback using `West` and `alpha_cubic = 3*(1-beta)/(1+beta)`.
+- Multiplicative decrease on triple duplicate ACKs and timeout.
+- Slow start behavior kept compatible with the project sender model.
 
-### 2.3 Shared assumptions
+## 3. Project Integration
 
-- Loss is applied to data packets only
-- ACK path is reliable in the selected model
-- Timeouts are per-packet
-- Jitter is population standard deviation
+### 3.1 Added files / changes
 
-## 3. Performance Metrics
+- Added `TCP_logic/cubic.py` (`TCPCubic` sender).
+- Wired CUBIC into `TCP_logic/experiment.py` so all sweeps run Tahoe, Reno, and CUBIC.
+- Generalized `TCP_logic/analysis.py` to summarize/plot an arbitrary algorithm set.
+- Added tests in `tests/test_cubic.py` and an integration smoke test in `tests/test_integration.py`.
+- Added long-distance runner `TCP_logic/run_integration_long_distance.py`.
+- Updated automation in `run_all.sh` to run the long-distance scenario.
 
-The following metrics are used:
+### 3.2 Validation
 
-- **Throughput**: `unique_packets_received / total_simulated_time`
-- **Goodput**: `unique_packets_delivered / total_packets_sent`
-- **Average Delay**: `mean(time_ACKed - time_first_sent)`
-- **Delay Jitter**: `std_dev(individual_delays)`
+All tests pass after integration:
 
-At least two metrics were required; this report uses all four.
+- `20 passed`
 
-## 4. Attempt 1 (Baseline Environment)
+## 4. Simulation Setup
 
-### 4.1 Why this attempt showed similar Tahoe/Reno behavior
+## 4.1 Shared DES assumptions
 
-In the baseline environment:
+- Loss applies to data packets only.
+- ACK path is reliable in the selected model.
+- Per-packet timeout events may fire after ACK; stale timeouts are ignored.
+- Jitter is population standard deviation.
 
-- Receiver behavior was simple and often did not create strong duplicate-ACK patterns
-- Loss sweep was mild (`0.00` to `0.10`)
-- Under these conditions, both algorithms tended to follow similar effective recovery behavior
+### 4.2 Metrics
 
-### 4.2 Baseline summary metrics (averaged over loss sweep)
+- **Throughput**: unique packets delivered per simulated second.
+- **Goodput**: unique packets delivered / total packets sent (includes retransmissions in denominator).
+- **Average Delay**: mean ACK delay from first send.
+- **Jitter**: population stdev of packet delay.
 
-| Metric | Tahoe | Reno | Better |
-|---|---:|---:|---|
-| Throughput | 79.1122 | 79.1122 | Tie |
-| Goodput | 0.9496 | 0.9496 | Tie |
-| Avg Delay | 0.2001 | 0.2001 | Tie |
-| Jitter | 0.0030 | 0.0030 | Tie |
+## 5. Results Under Different Network Conditions
 
-### 4.3 Baseline graph
+### 5.1 Condition A: Baseline sweep
 
-![Baseline Tahoe vs Reno](outputs/tahoe_vs_reno_metrics.png)
+- Loss sweep: `0.00` to `0.10` (step `0.01`)
+- Receiver: simple cumulative ACK
+- Default sender config
 
-## 5. Attempt 2 (Adjusted Environment to Expose Differences)
+| Metric | Tahoe | Reno | CUBIC | Better |
+|---|---:|---:|---:|---|
+| Throughput | 79.1122 | 79.1122 | 102.2895 | CUBIC |
+| Goodput | 0.9496 | 0.9496 | 0.9496 | Tie |
+| Avg Delay | 0.2001 | 0.2001 | 0.2001 | Tie |
+| Jitter | 0.0030 | 0.0030 | 0.0030 | Tie |
 
-To better highlight algorithm differences, a second environment was added.
+Figure:
 
-### 5.1 Changes made
+![Baseline Tahoe/Reno/CUBIC](outputs/tcp_cc_metrics.png)
 
-- Receiver mode changed to **gap-aware cumulative ACK** (allows duplicate ACK behavior on out-of-order/loss events)
-- Loss sweep changed to `0.02` to `0.20` (step `0.02`)
-- `total_packets` set to `400`
-- `timeout_interval` set to `0.9`
-- `initial_cwnd` set to `6.0`
-- `initial_ssthresh` set to `24.0`
+### 5.2 Condition B: Harsher loss + gap-aware ACK behavior
 
-### 5.2 Adjusted scenario summary metrics (averaged over loss sweep)
+- Loss sweep: `0.02` to `0.20` (step `0.02`)
+- Receiver: gap-aware cumulative ACK
+- `total_packets=400`, `timeout_interval=0.9`, `initial_cwnd=6.0`, `initial_ssthresh=24.0`
 
-| Metric | Tahoe | Reno | Better |
-|---|---:|---:|---|
-| Throughput | 5.0490 | 5.3912 | Reno |
-| Goodput | 0.2615 | 0.3737 | Reno |
-| Avg Delay | 0.4892 | 0.4324 | Reno |
-| Jitter | 0.3376 | 0.3309 | Reno |
+| Metric | Tahoe | Reno | CUBIC | Better |
+|---|---:|---:|---:|---|
+| Throughput | 5.0490 | 5.3912 | 5.0915 | Reno |
+| Goodput | 0.2615 | 0.3737 | 0.3481 | Reno |
+| Avg Delay | 0.4892 | 0.4324 | 0.4675 | Reno |
+| Jitter | 0.3376 | 0.3309 | 0.3487 | Reno |
 
-### 5.3 Adjusted scenario graph
+Figure:
 
-![Adjusted Scenario Tahoe vs Reno](outputs/alt_scenario/tahoe_vs_reno_metrics.png)
+![Alternate scenario Tahoe/Reno/CUBIC](outputs/alt_scenario/tcp_cc_metrics.png)
 
-## 6. Observations
+### 5.3 Condition C: Long-distance (higher RTT) scenario
 
-1. In the baseline setup, Tahoe and Reno produced nearly identical results because the environment did not strongly trigger Reno's fast recovery advantage.
-2. After introducing a gap-aware ACK environment and harsher loss conditions, Reno outperformed Tahoe on all reported metrics.
-3. The adjusted scenario better reflects the expected protocol-level difference: Reno generally recovers more efficiently under repeated loss events due to fast retransmit/fast recovery behavior.
+- Loss sweep: `0.00` to `0.06` (step `0.01`)
+- Receiver: gap-aware cumulative ACK
+- One-way propagation delay: `0.3s` (RTT about `0.6s`)
+- `total_packets=600`, `timeout_interval=2.0`, `initial_cwnd=6.0`, `initial_ssthresh=24.0`
+
+| Metric | Tahoe | Reno | CUBIC | Better |
+|---|---:|---:|---:|---|
+| Throughput | 2.7602 | 2.5122 | 2.5347 | Tahoe |
+| Goodput | 0.2841 | 0.4210 | 0.3932 | Reno |
+| Avg Delay | 0.9884 | 0.9213 | 0.9397 | Reno |
+| Jitter | 0.4232 | 0.4757 | 0.4805 | Tahoe |
+
+Figure:
+
+![Long-distance scenario Tahoe/Reno/CUBIC](outputs/long_distance/tcp_cc_metrics.png)
+
+## 6. Discussion
+
+1. CUBIC increases sending aggressiveness in low-to-moderate loss baseline conditions, which improved throughput in this simulator.
+2. In harsher and more loss-heavy conditions, Reno performed best overall by this implementation's measured metrics.
+3. In the long-distance setting, no single algorithm dominated all metrics; Reno led in goodput/delay while Tahoe led in throughput/jitter.
+4. This is realistic for a simplified DES: algorithm rankings depend strongly on loss model, ACK behavior, timeout settings, and flow composition.
 
 ## 7. Conclusion
 
-The project successfully implemented and compared TCP Tahoe and TCP Reno using a DES.  
-Two scenarios were evaluated:
+The PA2 DES now supports all three congestion-control algorithms required for the group assignment comparison:
 
-- A baseline environment where results were similar
-- An adjusted environment where Reno's improvement became clear
+- Tahoe
+- Reno
+- CUBIC (RFC 9438-inspired)
 
-This two-attempt comparison is useful for analysis and reporting because it explains both:
-
-- why initial results can look similar,
-- and how simulation conditions affect visibility of algorithm differences.
+The project demonstrates that CUBIC can deliver higher raw throughput in some environments, while Reno or Tahoe may remain more efficient in others depending on conditions and metric priorities.
 
 ## 8. Reproducibility
 
-From the project root:
+From project root:
 
 ```bash
 ./run_all.sh
 ```
 
-This command runs tests, Theo simulator sanity output, Leo baseline sweep, and the adjusted sweep with graphs.
+Optional toggles:
+
+- `RUN_ALT_SCENARIO=0` to skip alternate scenario
+- `RUN_LONG_DISTANCE_SCENARIO=0` to skip long-distance scenario
+
+Direct runners:
+
+```bash
+PYTHONPATH=. python -m TCP_logic.run_integration
+PYTHONPATH=. python -m TCP_logic.run_integration_alt
+PYTHONPATH=. python -m TCP_logic.run_integration_long_distance
+```

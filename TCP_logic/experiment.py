@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable
 
 from .config import SenderConfig
+from .cubic import TCPCubic
 from .interfaces import MetricsCollectorLike, NetworkLike, SimulatorLike
 from .models import ExperimentResult
 from .reno import TCPReno
@@ -28,7 +29,7 @@ def run_single_experiment(
     config: SenderConfig,
     simulation_factory: SimulationFactory,
 ) -> ExperimentResult:
-    """Run one Tahoe/Reno experiment against Theo's simulator APIs.
+    """Run one Tahoe/Reno/CUBIC experiment against Theo's simulator APIs.
 
     Expected integration assumptions from the shared project contract:
     - Loss is applied to data packets only.
@@ -41,6 +42,8 @@ def run_single_experiment(
         sender = TCPTahoe(stack.simulator, stack.network, stack.metrics, config)
     elif algorithm == "Reno":
         sender = TCPReno(stack.simulator, stack.network, stack.metrics, config)
+    elif algorithm == "Cubic":
+        sender = TCPCubic(stack.simulator, stack.network, stack.metrics, config)
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
 
@@ -75,7 +78,7 @@ def run_loss_sweep(
 
     for loss_probability in loss_probabilities:
         run_seed = base_seed + int(loss_probability * 10_000)
-        for algorithm in ("Tahoe", "Reno"):
+        for algorithm in ("Tahoe", "Reno", "Cubic"):
             result = run_single_experiment(
                 algorithm=algorithm,
                 loss_probability=loss_probability,

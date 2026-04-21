@@ -5,27 +5,53 @@ from pathlib import Path
 from .models import ExperimentResult
 
 
+def _algorithm_order(name: str) -> tuple[int, str]:
+    preferred = {"Tahoe": 0, "Reno": 1, "Cubic": 2}
+    return (preferred.get(name, 100), name)
+
+
+def _winner(values: dict[str, float], higher_is_better: bool) -> str:
+    if higher_is_better:
+        best_value = max(values.values())
+    else:
+        best_value = min(values.values())
+
+    winners = [k for k, v in values.items() if abs(v - best_value) < 1e-9]
+    winners.sort(key=_algorithm_order)
+    if len(winners) == 1:
+        return winners[0]
+    return "Tie(" + "/".join(winners) + ")"
+
+
 def summarize_results(results: list[ExperimentResult]) -> str:
     if not results:
         return "No experiment results were provided."
 
-    lines = ["TCP Tahoe vs Reno Summary", ""]
+    algorithms = sorted({r.algorithm for r in results}, key=_algorithm_order)
+    if len(algorithms) < 2:
+        return "Need at least two algorithms to compare results."
+
+    lines = ["TCP " + " vs ".join(algorithms) + " Summary", ""]
+
     for metric in ("throughput", "goodput", "avg_delay", "jitter"):
-        tahoe_values = [getattr(r, metric) for r in results if r.algorithm == "Tahoe"]
-        reno_values = [getattr(r, metric) for r in results if r.algorithm == "Reno"]
-        if not tahoe_values or not reno_values:
+        averages: dict[str, float] = {}
+        for algorithm in algorithms:
+            values = [getattr(r, metric) for r in results if r.algorithm == algorithm]
+            if not values:
+                continue
+            averages[algorithm] = sum(values) / len(values)
+
+        if len(averages) < 2:
             continue
 
-        tahoe_avg = sum(tahoe_values) / len(tahoe_values)
-        reno_avg = sum(reno_values) / len(reno_values)
-        if metric in ("throughput", "goodput"):
-            winner = "Reno" if reno_avg > tahoe_avg else "Tahoe"
-        else:
-            winner = "Reno" if reno_avg < tahoe_avg else "Tahoe"
+        higher_is_better = metric in ("throughput", "goodput")
+        winner = _winner(averages, higher_is_better=higher_is_better)
 
-        lines.append(
-            f"- {metric}: Tahoe={tahoe_avg:.4f}, Reno={reno_avg:.4f}, better={winner}"
+        metric_values = ", ".join(
+            f"{algorithm}={averages[algorithm]:.4f}" for algorithm in algorithms if algorithm in averages
         )
+
+        lines.append(f"- {metric}: {metric_values}, better={winner}")
 
     return "\n".join(lines)
 
@@ -41,7 +67,9 @@ def plot_results(results: list[ExperimentResult], output_dir: str = "outputs") -
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    sorted_results = sorted(results, key=lambda item: item.loss_probability)
+    sorted_results = sorted(results, key=lambda item: (item.loss_probability, _algorithm_order(item.algorithm)))
+    algorithms = sorted({r.algorithm for r in sorted_results}, key=_algorithm_order)
+
     metrics = [
         ("throughput", "Throughput (packets/sec)"),
         ("goodput", "Goodput (ratio)"),
@@ -53,7 +81,7 @@ def plot_results(results: list[ExperimentResult], output_dir: str = "outputs") -
     axes_flat = axes.flatten()
 
     for axis, (metric_key, metric_label) in zip(axes_flat, metrics):
-        for algorithm in ("Tahoe", "Reno"):
+        for algorithm in algorithms:
             algorithm_rows = [r for r in sorted_results if r.algorithm == algorithm]
             x_vals = [r.loss_probability for r in algorithm_rows]
             y_vals = [getattr(r, metric_key) for r in algorithm_rows]
@@ -65,9 +93,9 @@ def plot_results(results: list[ExperimentResult], output_dir: str = "outputs") -
         axis.grid(True, alpha=0.3)
         axis.legend()
 
-    figure.suptitle("TCP Tahoe vs Reno Performance", fontsize=14)
+    figure.suptitle("TCP Congestion Control Performance", fontsize=14)
 
-    output_file = output_path / "tahoe_vs_reno_metrics.png"
+    output_file = output_path / "tcp_cc_metrics.png"
     figure.savefig(output_file)
     plt.close(figure)
     return output_file

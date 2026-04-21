@@ -9,7 +9,7 @@ from .models import PacketRecord
 
 
 class TCPSender(ABC):
-    """Shared sender behavior for Tahoe/Reno without simulator internals."""
+    """Shared sender behavior for Tahoe/Reno/CUBIC without simulator internals."""
 
     timeout_event_type = "TIMEOUT"
 

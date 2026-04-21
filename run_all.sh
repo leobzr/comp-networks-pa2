@@ -37,3 +37,9 @@ if [[ "${RUN_ALT_SCENARIO:-1}" == "1" ]]; then
     echo "Running Leo alternate integration sweep (gap-aware ACK scenario)..."
     PYTHONPATH="$ROOT_DIR" python -m TCP_logic.run_integration_alt
 fi
+
+if [[ "${RUN_LONG_DISTANCE_SCENARIO:-1}" == "1" ]]; then
+    echo
+    echo "Running Leo long-distance integration sweep (higher RTT scenario)..."
+    PYTHONPATH="$ROOT_DIR" python -m TCP_logic.run_integration_long_distance
+fi

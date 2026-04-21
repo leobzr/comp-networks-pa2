@@ -5,7 +5,7 @@
 Project implementation is complete and integrated.
 
 - Theo completed the DES core (`tcp_des`): clock, events, queue, simulator loop, network/loss model, metrics, and base abstractions.
-- Leo completed TCP logic (`TCP_logic`): Tahoe, Reno, experiments, and analysis.
+- Leo completed TCP logic (`TCP_logic`): Tahoe, Reno, CUBIC, experiments, and analysis.
 - Integration adapters connect both sides and run end-to-end experiments.
 - Unified and component-level run scripts are available.
 
@@ -14,8 +14,8 @@ Project implementation is complete and integrated.
 - Discrete event simulator with event types: `SEND`, `RECEIVE`, `ACK`, `TIMEOUT`, `DROP`
 - Fixed RTT model and configurable packet loss probability sweep
 - Performance metrics: throughput, goodput, average delay, delay jitter
-- TCP Tahoe and TCP Reno sender behavior with integration tests
-- Graph generation for Tahoe vs Reno comparison
+- TCP Tahoe, TCP Reno, and TCP CUBIC sender behavior with integration tests
+- Graph generation for multi-algorithm comparison under multiple scenarios
 
 ## Finalized Assumptions
 
@@ -36,5 +36,8 @@ This runs merged tests, Theo demo metrics, and Leo integration sweep/plot.
 ## Output
 
 - Test suites for DES core and integrated TCP behavior
-- Console summary comparing Tahoe vs Reno
-- Plot image saved to `outputs/tahoe_vs_reno_metrics.png`
+- Console summaries comparing Tahoe vs Reno vs CUBIC
+- Plot images saved to:
+	- `outputs/tcp_cc_metrics.png`
+	- `outputs/alt_scenario/tcp_cc_metrics.png`
+	- `outputs/long_distance/tcp_cc_metrics.png`

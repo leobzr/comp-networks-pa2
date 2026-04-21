@@ -33,7 +33,7 @@ class GapAwareCumulativeAckReceiver(BaseReceiver):
 
 
 class SenderBridge(BaseSender):
-    """Bridge simulator callbacks into Leo sender callbacks."""
+    """Bridge simulator callbacks into Leo's sender callbacks."""
 
     def __init__(self, sender) -> None:
         self._sender = sender
@@ -49,7 +49,7 @@ class SenderBridge(BaseSender):
 
 
 class SimulatorAdapter:
-    """Adapts Leo schedule_event shape to simulator EventType events."""
+    """Adapts Leo's schedule_event shape to simulator EventType events."""
 
     def __init__(self, simulator: Simulator) -> None:
         self._simulator = simulator
@@ -92,7 +92,7 @@ class NetworkAdapter:
 
 
 class MetricsAdapter:
-    """Adapts simulator metric names/signature to Leo expectations."""
+    """Adapts simulator metric names/signature to Leo's expectations."""
 
     def __init__(self, metrics: MetricsCollector, simulator: Simulator) -> None:
         self._metrics = metrics

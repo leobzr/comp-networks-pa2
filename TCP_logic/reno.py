@@ -28,7 +28,7 @@ class TCPReno(TCPSender):
         if self.cwnd < self.ssthresh:
             self.cwnd += 1.0
         else:
-            self.cwnd = self.additive_increase(self.cwnd)
+            self.cwnd = self.additive_increase(self.cwnd) # congestion avoidance
 
     def _on_duplicate_ack(self, ack_id: int, dup_ack_count: int) -> None:
         if not self.in_fast_recovery and dup_ack_count == self.config.dup_ack_threshold:
